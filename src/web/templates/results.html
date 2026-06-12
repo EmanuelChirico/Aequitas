@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Risultati{% endblock %}
+{% block content %}
+<h1>Risultati Certificati</h1>
+
+{% if not bulletin %}
+  <div class="card warn">I risultati saranno visibili non appena lo spoglio pubblico sarà completato.</div>
+{% else %}
+  <h2>Conteggio Voti</h2>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Candidato / Lista</th>
+          <th style="text-align: right; width: 150px;">Preferenze ricevute</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k, v in bulletin.results.items() %}
+        <tr>
+          <td style="font-weight: 600; color: var(--navy);">{{ k }}</td>
+          <td style="text-align: right;"><span class="mono" style="font-size: 1rem; font-weight:700;">{{ v }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if verifica_ok %}
+  <h2>Verifica Matematica Universale</h2>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Controllo di Integrità</th>
+          <th style="text-align: right; width: 120px;">Esito</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for check, ok in verifica_ok.items() %}
+        <tr>
+          <td style="text-transform: capitalize;">{{ check.replace("_", " ") }}</td>
+          <td style="text-align: right;">
+            {% if ok %}
+              <span class="status-badge ok">✓ Valido</span>
+            {% else %}
+              <span class="status-badge fail">✗ Fallito</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    
+    <div style="padding: 1.25rem; border-top: 1px solid var(--border); background: #f8fafc; text-align: center;">
+      {% if verifica_ok.values()|list|min %}
+        <span class="status-badge ok" style="font-size: 0.95rem; padding: 0.5rem 1.5rem;">✓ VERIFICA UNIVERSALE SUPERATA</span>
+      {% else %}
+        <span class="status-badge fail" style="font-size: 0.95rem; padding: 0.5rem 1.5rem;">✗ VERIFICA UNIVERSALE FALLITA</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

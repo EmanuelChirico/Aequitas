@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Ricevuta{% endblock %}
+{% block content %}
+<h1>Voto Registrato</h1>
+
+<div class="card ok">
+  <h2 style="color:var(--ok); margin: 0 0 .5rem 0;">✓ Operazione completata</h2>
+  <p style="color: var(--text-sec); margin-bottom: 1rem;">La tua scheda è stata acquisita dai nodi del sistema.</p>
+  
+  <strong style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-sec);">Codice Ricevuta (SHA256):</strong>
+  <div style="margin-top:.4rem">
+    <code style="display:block; font-size:.85rem; padding:1rem; background:#ffffff; border:1px solid var(--ok-border); border-radius:10px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);">{{ h }}</code>
+  </div>
+</div>
+
+<div class="card" style="background: transparent; border-style: dashed;">
+  <p style="margin: 0;">
+    <strong>Nota importante:</strong> Salva questo identificativo univoco. Al termine delle votazioni potrai usarlo per accertarti in modo matematico che il tuo voto sia presente nel registro pubblico e sia stato conteggiato correttamente.
+  </p>
+</div>
+
+<div style="display:flex; gap:1rem; margin-top:2rem; flex-wrap:wrap">
+  <a href="/receipt/{{ h }}" class="btn">Verifica Istantanea</a>
+  <a href="/bulletin" class="btn btn-secondary">Consulta il Bollettino</a>
+</div>
+{% endblock %}

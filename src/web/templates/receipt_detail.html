@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Verifica ricevuta{% endblock %}
+{% block content %}
+<h1>Verifica Individuale Scheda</h1>
+
+<div class="card">
+  <strong style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Ricevuta Cercata</strong>
+  <code style="margin-top:.5rem; display:block; padding: .75rem; background: #fafafa;">{{ h }}</code>
+</div>
+
+{% if not frozen %}
+  <div class="card warn">Le urne sono ancora aperte: la prova crittografica di inclusione sarà generata automaticamente dopo lo spoglio.</div>
+{% else %}
+  <div class="card {% if inclusion_ok %}ok{% else %}fail{% endif %}">
+    <strong style="font-size: 1rem;">Verifica Presenza nel Registro:</strong>
+    <div style="margin-top: .5rem;">
+      {% if inclusion_ok %}
+        <span class="status-badge ok" style="font-size:0.9rem;">✓ Prova di Merkle Corretta</span>
+      {% elif inclusion_ok == false %}
+        <span class="status-badge fail" style="font-size:0.9rem;">✗ Prova non valida o non inclusa</span>
+      {% else %}
+        <span class="status-badge warn" style="font-size:0.9rem;">— Stato non verificabile</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if opening %}
+  <h2>Dettaglio Crittografico dell'Apertura</h2>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Variabile</th>
+          <th>Valore Crittografico</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>v</strong> (Scelta estratta)</td>
+          <td><span class="status-badge ok" style="font-size:0.85rem;">{{ opening.v }}</span></td>
+        </tr>
+        <tr>
+          <td><strong>m'</strong> (Pre-immagine)</td>
+          <td><code style="font-size: 0.78rem;">{{ opening.m_prime }}</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="padding: 1rem 1.25rem; background: #f8fafc; border-top:1px solid var(--border)">
+      <p class="hint" style="margin:0;">
+        💡 <strong>Formula di controllo universale:</strong> Chiunque può validare l'uguaglianza computando <code>pow(m', e, N) == C</code> utilizzando esclusivamente la chiave pubblica dell'elezione.
+      </p>
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

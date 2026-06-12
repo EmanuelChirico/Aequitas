@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Vota{% endblock %}
+{% block content %}
+<h1>Esprimi la tua preferenza</h1>
+
+{% if accreditato %}
+  <div class="card warn">Attenzione: hai già ottenuto un accreditamento crittografico per questa sessione.</div>
+{% endif %}
+
+<form method="POST" action="/vote" style="margin-top: 1.5rem;">
+  {% for lista, candidati in candidati.items() %}
+  <fieldset>
+    <legend>{{ lista }}</legend>
+    {% for c in candidati %}
+    <label class="choice">
+      <input type="radio" name="_scelta" value="{{ lista }}|||{{ c }}"
+             onchange="document.getElementById('f-lista').value='{{ lista }}';
+                       document.getElementById('f-candidato').value='{{ c }}'">
+      <span>{{ c }}</span>
+    </label>
+    {% endfor %}
+  </fieldset>
+  {% endfor %}
+
+  <input type="hidden" id="f-lista"     name="lista"     value="">
+  <input type="hidden" id="f-candidato" name="candidato" value="">
+
+  <div class="card" style="background: #f8fafc; border-style: dashed;">
+    <p class="hint" style="margin: 0; font-size: 0.88rem; color: var(--text-sec);">
+     🔒 <strong>Sicurezza end-to-end:</strong> La tua preferenza viene cifrata in locale tramite algoritmo RSA-OAEP prima dell'invio. Il server riceverà solo il pacchetto cifrato e non potrà conoscerne il contenuto in chiaro fino allo spoglio pubblico.
+    </p>
+  </div>
+  
+  <input type="submit" value="Invia il voto in sicurezza" style="margin-top:1rem; width: 100%;">
+</form>
+{% endblock %}

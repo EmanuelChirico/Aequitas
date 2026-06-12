@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<h1>Elezione: {{ election_id }}</h1>
+
+<div class="card">
+  <span style="margin-right: 0.5rem; font-weight: 600;">Stato urne:</span>
+  {% if frozen %}
+    <span class="status-badge fail">● CHIUSE</span>
+    <p class="hint" style="margin-top: 0.5rem;">Lo spoglio delle schede è attualmente in corso o completato.</p>
+  {% else %}
+    <span class="status-badge ok">● APERTE</span>
+    <p class="hint" style="margin-top: 0.5rem;">Le urne sono attive. È possibile esprimere la propria preferenza.</p>
+  {% endif %}
+</div>
+
+{% if user %}
+  <p>Benvenuto nel portale di voto, <strong>{{ user.email }}</strong>.</p>
+  {% if not frozen %}
+    <a href="/vote" class="btn" style="margin-top:1rem">Vai alla cabina elettorale →</a>
+  {% endif %}
+{% else %}
+  <div class="card" style="text-align: center; padding: 2rem;">
+    <p style="margin-bottom: 1.5rem;">Autenticati con il tuo account istituzionale per partecipare all'elezione.</p>
+    <a href="/login" class="btn">Accedi con Google</a>
+  </div>
+{% endif %}
+
+<hr>
+
+<details>
+  <summary>Pannello di Amministrazione</summary>
+  <div class="details-body">
+    <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--navy)">Chiusura Urne</h3>
+    <form method="POST" action="/admin/close">
+      <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap">
+        <input type="password" name="admin_token" placeholder="Inserisci Token Admin">
+        <input type="submit" value="Chiudi e avvia spoglio" class="btn-secondary">
+      </div>
+    </form>
+  </div>
+</details>
+{% endblock %}

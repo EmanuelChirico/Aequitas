@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Bollettino{% endblock %}
+{% block content %}
+<h1>Bollettino Pubblico</h1>
+
+{% if not bulletin %}
+  <div class="card warn">Il bollettino non è ancora stato pubblicato — Lo spoglio non è completo.</div>
+  {% if vbr %}
+    <p>Schede registrate correntemente: <strong>{{ vbr.registro|length }}</strong> 
+       &nbsp;·&nbsp; Urne: 
+       {% if vbr.frozen %}
+         <span class="status-badge fail">Chiuse</span>
+       {% else %}
+         <span class="status-badge ok">Aperte</span>
+       {% endif %}
+    </p>
+  {% endif %}
+{% else %}
+  <div class="card">
+    <h3 style="margin-bottom:1rem; font-size:1rem;">Parametri di Configurazione</h3>
+    <div class="table-container">
+      <table>
+        <tr><td style="color:var(--text-muted); width:200px; font-weight:500;">Identificativo Elezione</td><td><strong>{{ bulletin.params.election_id }}</strong></td></tr>
+        <tr><td style="color:var(--text-muted); font-weight:500;">ρ Radice di Merkle</td><td><code>{{ bulletin.rho }}</code></td></tr>
+        <tr><td style="color:var(--text-muted); font-weight:500;">Soglia Shamir (t / n)</td><td>Soglia: <strong class="mono">{{ bulletin.params.t }}</strong> su <strong class="mono">{{ bulletin.params.n }}</strong> nodi</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h2>Registro Ufficiale ({{ bulletin.registro|length }} schede)</h2>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 70px;">#</th>
+          <th>R (Identificativo Monouso)</th>
+          <th>C (Voto Cifrato)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in bulletin.registro %}
+        <tr>
+          <td style="color:var(--text-muted); font-weight: 600;">{{ loop.index }}</td>
+          <td><code>{{ r.R[:24] }}…</code></td>
+          <td><code>{{ r.C[:32] }}…</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Pre-immagini Raw Decifrate</h2>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>R (Corrispondenza)</th>
+          <th>Preferenza estratta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in bulletin.pre_images %}
+        <tr>
+          <td><code>{{ p.R[:24] }}…</code></td>
+          <td><span class="status-badge ok" style="font-size:0.85rem;">{{ p.v }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}
