@@ -129,4 +129,12 @@ Voter ──► VBR (submit vote)  ──► Receipt + Merkle proof
 
 ---
 
-*Academic prototype — not intended for production use.*
+---
+
+## Disclaimer
+
+This project was developed for academic and educational purposes within the course *Algoritmi e Protocolli di Sicurezza* at the University of Salerno.
+
+The implementation serves as a proof-of-concept prototype and has not undergone the extensive security review, formal verification, or operational testing required for deployment in real-world elections.
+
+**Not intended for production use.**
