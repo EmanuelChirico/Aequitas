@@ -1,7 +1,14 @@
 # Aequitas — Secure E-Voting Protocol
 
-**Authors:** Autorino Luigi, Emanuel Chirico  
-**Course:** Algoritmi e Protocolli di Sicurezza  
+![Aequitas Logo](logo/logo.jpg)
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.x-lightgrey?logo=flask)
+![Crypto](https://img.shields.io/badge/Crypto-RSA--OAEP%20%7C%20Shamir%20SSS%20%7C%20Merkle-blueviolet)
+![Status](https://img.shields.io/badge/Status-Academic%20Prototype-orange)
+
+**Authors:** Autorino Luigi, Emanuel Chirico
+**Course:** Algoritmi e Protocolli di Sicurezza
 **Institution:** Università degli Studi di Salerno
 
 ---
@@ -13,7 +20,7 @@ Aequitas is a cryptographic protocol for secure digital elections with nominal p
 The project is divided into four Work Packages:
 
 | WP | Title | Content |
-|----|-------|---------|
+| --- | --- | --- |
 | **WP1** | Threat Modeling & Architecture | Security properties, adversarial models, system actors |
 | **WP2** | Protocol Specification | Setup, voting, tallying phases; RSA-OAEP, Shamir SSS, Merkle trees |
 | **WP3** | Security Analysis | Threat resilience, parameter selection, residual risks |
@@ -23,17 +30,19 @@ The project is divided into four Work Packages:
 
 ## Key Properties
 
-- **Minimal Trust** — Private election key never exists in one place: split via Shamir threshold secret sharing across N trustees.
-- **End-to-End Verifiability** — Voters verify their ballot inclusion via personal receipt; external observers validate the full tally cryptographically.
-- **Voter Privacy** — Token-based authorization decoupled from preference encryption; temporal decorrelation via random delays.
-- **Integrity** — Atomic ballot acceptance prevents double voting; publicly verifiable decryption prevents result manipulation.
-- **Scalability** — Lightweight per-ballot validation at submission; heavy computation deferred to post-election tallying.
+| Property | Description |
+| --- | --- |
+| **Minimal Trust** | Private election key never exists in one place: split via Shamir threshold secret sharing across N trustees |
+| **End-to-End Verifiability** | Voters verify ballot inclusion via personal receipt; external observers validate the full tally cryptographically |
+| **Voter Privacy** | Token-based authorization decoupled from preference encryption; temporal decorrelation via random delays |
+| **Integrity** | Atomic ballot acceptance prevents double voting; publicly verifiable decryption prevents result manipulation |
+| **Scalability** | Lightweight per-ballot validation at submission; heavy computation deferred to post-election tallying |
 
 ---
 
 ## Repository Structure
 
-```
+```text
 Aequitas/
 ├── .env                        # Segreti locali (Google OAuth, admin token) — non versionato
 ├── requirements.txt
@@ -60,6 +69,8 @@ Aequitas/
         └── templates/          # Template Jinja2 (index, vote, receipt, results, …)
 ```
 
+---
+
 ## Setup & Run
 
 ```bash
@@ -78,16 +89,32 @@ cp .env.example .env            # poi edita con le credenziali Google OAuth
 python src/main.py
 ```
 
-### Environment variables (`.env`)
+### Environment Variables (`.env`)
 
-| Variabile | Descrizione |
-|-----------|-------------|
+| Variable | Description |
+| --- | --- |
 | `GOOGLE_CLIENT_ID` | Client ID app Google OAuth |
 | `GOOGLE_CLIENT_SECRET` | Client Secret app Google OAuth |
 | `FLASK_SECRET_KEY` | Chiave per la firma dei cookie di sessione |
 
-### Test
+### Testing
 
 ```bash
 pytest tests/
 ```
+
+---
+
+## Protocol Architecture
+
+```text
+Voter ──► IAP (authenticate) ──► Token
+Voter ──► E   (get ballot)   ──► Encrypted ballot form
+Voter ──► VBR (submit vote)  ──► Receipt + Merkle proof
+              │
+              └──► TallyMachine ──► Trustees (threshold decrypt) ──► Results
+```
+
+---
+
+*Academic prototype — not intended for production use.*
