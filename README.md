@@ -7,9 +7,21 @@
 ![Crypto](https://img.shields.io/badge/Crypto-RSA--OAEP%20%7C%20Shamir%20SSS%20%7C%20Merkle-blueviolet)
 ![Status](https://img.shields.io/badge/Status-Academic%20Prototype-orange)
 
-**Authors:** Autorino Luigi, Emanuel Chirico
+## Academic Information
+
+**Project:** Aequitas — Secure E-Voting Protocol
+
 **Course:** Algoritmi e Protocolli di Sicurezza
+
+**Degree Program:** M.Sc. in Computer Science
+
 **Institution:** Università degli Studi di Salerno
+
+**Academic Year:** 2025–2026
+
+**Authors:**
+- Autorino Luigi
+- Chirico Emanuel
 
 ---
 
