@@ -42,15 +42,15 @@ def _commit(S_i: int, r_i: bytes) -> bytes:
     return _sha256(S_i.to_bytes(SHARE_BYTES, "big") + r_i)
 
 
-def _leaf(R: bytes, sigma: int, C: bytes) -> bytes:
-    return _sha256(R + sigma.to_bytes(256, "big") + C)
+def _leaf(R: bytes, sigma: bytes, C: bytes) -> bytes:
+    return _sha256(R + sigma + C)
 
 
 @dataclass
 class TallyMachine:
     _vbr_snapshot: Optional[list]  = field(default=None, init=False, repr=False)
     _rho: Optional[bytes]          = field(default=None, init=False, repr=False)
-    _rho_sigma: Optional[int]      = field(default=None, init=False, repr=False)
+    _rho_sigma: Optional[bytes]    = field(default=None, init=False, repr=False)
     _valid_shares: list            = field(default_factory=list, init=False, repr=False)
     _d: Optional[int]              = field(default=None, init=False, repr=False)
     _N: Optional[int]              = field(default=None, init=False, repr=False)
@@ -90,7 +90,7 @@ class TallyMachine:
             f"rho={self._rho.hex()[:24]}…"
         )
 
-    def set_rho_signature(self, rho_sigma: int, pk_E) -> None:
+    def set_rho_signature(self, rho_sigma: bytes, pk_E) -> None:
         """
         Verifica la firma di E su rho e la memorizza.
         Da chiamare dopo load_uvc(), con la sigma restituita da E.freeze_and_sign.
@@ -181,7 +181,7 @@ class TallyMachine:
         pub = pk_elec.public_numbers()
         N, e = pub.n, pub.e
 
-        results: dict[str, int] = {"nulle": 0}
+        results: dict[str, int] = {}
         self._pre_images = []
 
         for R, sigma, C in self._vbr_snapshot:
@@ -197,12 +197,8 @@ class TallyMachine:
             except (InvalidOAEP, UnicodeDecodeError):
                 v = None     # scheda nulla
 
-            if v and v in results:
-                results[v] += 1
-            elif v:
-                results[v] = 1
-            else:
-                results["nulle"] += 1
+            key = v if v else "nulle"
+            results[key] = results.get(key, 0) + 1
 
             self._pre_images.append({
                 "R":       R.hex(),

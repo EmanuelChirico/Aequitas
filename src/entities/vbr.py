@@ -3,7 +3,7 @@ VBR — Verified Ballot Register (§4.4).
 
 Registro append-only U delle triple (R, sigma, C):
   - R:     token del votante (32 byte)
-  - sigma: firma IAP su R   (intero, hash-and-sign)
+  - sigma: firma IAP su R   (bytes, RSA-PSS)
   - C:     voto cifrato      (bytes, output OAEP)
 
 Invarianti:
@@ -30,10 +30,9 @@ def _sha256(data: bytes) -> bytes:
     return hashlib.sha256(data).digest()
 
 
-def _leaf(R: bytes, sigma: int, C: bytes) -> bytes:
-    """Foglia Merkle: SHA256(R || sigma_bytes || C)."""
-    sigma_bytes = sigma.to_bytes(256, "big")   # 256 B per RSA-2048
-    return _sha256(R + sigma_bytes + C)
+def _leaf(R: bytes, sigma: bytes, C: bytes) -> bytes:
+    """Foglia Merkle: SHA256(R || sigma || C)."""
+    return _sha256(R + sigma + C)
 
 
 @dataclass
@@ -52,7 +51,7 @@ class VBR:
     # §4.4 — Ricezione voti                                                #
     # ------------------------------------------------------------------ #
 
-    def submit(self, R: bytes, sigma: int, C: bytes) -> bytes:
+    def submit(self, R: bytes, sigma: bytes, C: bytes) -> bytes:
         """
         Registra un voto.
 
@@ -158,10 +157,10 @@ class VBR:
 
     def publish(
         self,
-        rho_sigma: int,
+        rho_sigma: bytes,
         pre_images: list[dict],
         results: dict,
-        results_sigma: int,
+        results_sigma: bytes,
         path: str = BULLETIN_FILE,
     ) -> None:
         """
@@ -189,7 +188,7 @@ class VBR:
         registro = [
             {
                 "R":     R.hex(),
-                "sigma": sigma,
+                "sigma": sigma.hex(),
                 "C":     C.hex(),
             }
             for R, sigma, C in self._U
@@ -199,10 +198,10 @@ class VBR:
             "params":         self._params,
             "registro":       registro,
             "rho":            self._rho.hex(),
-            "rho_sigma":      rho_sigma,
+            "rho_sigma":      rho_sigma.hex(),
             "pre_images":     pre_images,
             "results":        results,
-            "results_sigma":  results_sigma,
+            "results_sigma":  results_sigma.hex(),
         }
 
         with open(path, "w", encoding="utf-8") as f:

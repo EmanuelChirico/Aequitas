@@ -1,75 +1,47 @@
-"""
-Shamir Secret Sharing implementato a mano (§7.3).
-
-Campo finito: Z_Q dove Q = 2^2281 - 1 (primo di Mersenne).
-  - Q > d per qualsiasi d prodotto da RSA-2048, quindi il segreto sta nel campo.
-  - Usare un Mersenne noto evita di implementare test di primalità.
-
-Funzioni:
-  split(d, n, t)              → [S_1, ..., S_n]   (share come interi)
-  reconstruct(indexed_shares) → d                  (da ≥ t coppie (i, S_i))
-"""
+# Shamir Secret Sharing - schema (t, n)
+# usiamo Z_Q con Q = 2^2281 - 1 (primo di Mersenne) cosi' il segreto RSA ci sta dentro
+# split -> lista di n share (interi)
+# reconstruct -> segreto originale da almeno t share
 
 import secrets
-
 from config import Q, T, N_TRUSTEES
 
 
-def _poly_eval(coefficients: list[int], x: int) -> int:
-    """Valuta il polinomio sum(a_k * x^k) mod Q con la regola di Horner."""
-    v = 0
-    for coeff in reversed(coefficients):
-        v = (v * x + coeff) % Q
-    return v
+def _eval_poly(coeffs, x):
+    # calcola f(x) mod Q 
+    result = 0
+    for c in reversed(coeffs):
+        result = (result * x + c) % Q
+    return result
 
 
-def split(d: int, n: int = N_TRUSTEES, t: int = T) -> list[int]:
-    """
-    Divide il segreto d in n share con soglia t.
-
-    Costruisce un polinomio f di grado t-1 con f(0) = d e
-    coefficienti a_1..a_{t-1} casuali in Z_Q.
-    Restituisce [S_1, ..., S_n] dove S_i = f(i) mod Q.
-    L'indice i (1-based) è l'ascissa implicita della share.
-
-    Args:
-        d: segreto (esponente privato RSA), deve essere in [0, Q).
-        n: numero di share da produrre.
-        t: soglia minima per la ricostruzione.
-    """
+def split(d, n=N_TRUSTEES, t=T):
+    # costruisce un polinomio casuale di grado t-1 con termine noto d
+    # e poi valuta in 1, 2, ..., n per ottenere le share
     if not (0 <= d < Q):
-        raise ValueError(f"Il segreto deve essere in [0, Q); d ha {d.bit_length()} bit")
+        raise ValueError(f"segreto fuori range, d ha {d.bit_length()} bit")
     if t > n:
-        raise ValueError("La soglia t non può superare il numero di share n")
+        raise ValueError("soglia t maggiore del numero di share n")
 
-    # Polinomio: f(x) = d + a_1*x + a_2*x^2 + ... + a_{t-1}*x^{t-1}
-    coefficients = [d] + [secrets.randbelow(Q) for _ in range(t - 1)]
-    return [_poly_eval(coefficients, i) for i in range(1, n + 1)]
+    # f(x) = d + a1*x + a2*x^2 + ... + a_{t-1}*x^{t-1}
+    coeffs = [d] + [secrets.randbelow(Q) for _ in range(t - 1)]
+    shares = [_eval_poly(coeffs, i) for i in range(1, n + 1)]
+    return shares
 
 
-def reconstruct(indexed_shares: list[tuple[int, int]]) -> int:
-    """
-    Ricostruisce il segreto d da ≥ t coppie (i, S_i) tramite
-    interpolazione di Lagrange valutata in x = 0.
-
-        d = f(0) = sum_i S_i * L_i(0)   mod Q
-
-    dove L_i(0) = prod_{j≠i} (-x_j) / (x_i - x_j)  mod Q.
-
-    Usa pow(x, -1, Q) (Python 3.8+) per l'inverso modulare.
-
-    Args:
-        indexed_shares: lista di (x_i, S_i) con x_i = trustee_id (1-based).
-    """
+def reconstruct(indexed_shares):
+    # interpolazione di Lagrange in x=0 per recuperare f(0) = d
+    # ogni share e' una coppia (i, S_i) dove i e' l'indice del trustee (parte da 1)
     secret = 0
-    for i, (xi, Si) in enumerate(indexed_shares):
+    for i, (xi, si) in enumerate(indexed_shares):
         num = 1
         den = 1
         for j, (xj, _) in enumerate(indexed_shares):
-            if i != j:
-                num = (num * (-xj)) % Q
-                den = (den * (xi - xj)) % Q
-        # L_i(0) = num * den^{-1} mod Q
-        lagrange_i = Si * num % Q * pow(den, -1, Q) % Q
-        secret = (secret + lagrange_i) % Q
+            if i == j:
+                continue
+            num = (num * (-xj)) % Q
+            den = (den * (xi - xj)) % Q
+        # coefficiente di Lagrange: L_i(0) = num / den mod Q
+        li = si * num % Q * pow(den, -1, Q) % Q
+        secret = (secret + li) % Q
     return secret

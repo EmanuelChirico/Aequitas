@@ -23,9 +23,9 @@ import sys
 import time
 
 # Aggiunge src/ al path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from config import N_TRUSTEES, T
+from config import N_TRUSTEES
 from crypto.rsa_utils import gen_rsa_keypair, oaep_encrypt, hash_and_sign
 from entities.electoral_auth import ElectoralAuthority
 from entities.iap import IAP

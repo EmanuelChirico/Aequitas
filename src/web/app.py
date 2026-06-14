@@ -21,6 +21,7 @@ Authlib/Google: segue il demo flask-google-login ufficiale di Authlib
   Le credenziali OAuth si leggono da variabili d'ambiente (vedi .env.example).
 """
 
+import hashlib
 import json
 import os
 
@@ -168,7 +169,7 @@ def create_app(e, iap, vbr, tm, trustees) -> Flask:
         # Cifratura del voto
         try:
             C, h = vc.encrypt_vote(v_string, e_obj.pk_elec)
-        except RuntimeError as err:
+        except (RuntimeError, ValueError) as err:
             flash(f"Errore cifratura: {err}")
             return redirect(url_for("vote"))
 
@@ -219,7 +220,8 @@ def create_app(e, iap, vbr, tm, trustees) -> Flask:
                 with open(BULLETIN_FILE, encoding="utf-8") as f:
                     bull = json.load(f)
                 for entry in bull.get("pre_images", []):
-                    if entry.get("C") == h_hex:
+                    C_bytes = bytes.fromhex(entry.get("C", ""))
+                    if hashlib.sha256(C_bytes).digest() == h:
                         opening_info = entry
                         break
 
@@ -241,6 +243,8 @@ def create_app(e, iap, vbr, tm, trustees) -> Flask:
         if os.path.exists(BULLETIN_FILE):
             with open(BULLETIN_FILE, encoding="utf-8") as f:
                 bull = json.load(f)
+            for entry in bull.get("registro", []):
+                entry["h"] = hashlib.sha256(bytes.fromhex(entry["C"])).hexdigest()
         return render_template(
             "bulletin.html",
             bulletin=bull,
@@ -351,7 +355,7 @@ def _verifica_universale(bull: dict) -> dict:
     def leaf(R_hex, sigma, C_hex):
         return sha256(
             bytes.fromhex(R_hex)
-            + int(sigma).to_bytes(256, "big")
+            + bytes.fromhex(sigma)
             + bytes.fromhex(C_hex)
         )
 
@@ -367,11 +371,8 @@ def _verifica_universale(bull: dict) -> dict:
         R_set = set()
         pk_iap_n = params.get("pk_iap_n")
 
-        class _FakePub:
-            def public_numbers(self):
-                class _N:
-                    n, e = pk_iap_n, 65537
-                return _N()
+        from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
+        pk_iap = RSAPublicNumbers(e=65537, n=pk_iap_n).public_key()
 
         unicity_ok = True
         for r in registro:
@@ -380,7 +381,7 @@ def _verifica_universale(bull: dict) -> dict:
                 unicity_ok = False
                 break
             # Verifica firma IAP su R
-            if not hash_and_verify(_FakePub(), R_bytes, int(r["sigma"])):
+            if not hash_and_verify(pk_iap, R_bytes, bytes.fromhex(r["sigma"])):
                 unicity_ok = False
                 break
             R_set.add(R_bytes)

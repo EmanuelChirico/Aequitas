@@ -28,26 +28,62 @@
   </div>
 
   <h2>Registro Ufficiale ({{ bulletin.registro|length }} schede)</h2>
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <strong style="font-size:0.9rem;">Verifica la tua ricevuta</strong>
+    <p style="color:var(--text-muted); font-size:0.85rem; margin:.25rem 0 .75rem 0;">
+      Incolla il codice ricevuta ottenuto al momento del voto — la riga corrispondente verrà evidenziata.
+    </p>
+    <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+      <input id="cerca-h" type="text"
+             placeholder="Es. a3f1c9d2…  (64 caratteri hex)"
+             style="flex:1; min-width:200px; padding:.5rem .75rem; border:1px solid var(--border);
+                    border-radius:6px; font-family:monospace; font-size:.85rem;">
+      <button onclick="cercaRicevuta()" class="btn">Cerca</button>
+    </div>
+    <div id="cerca-result" style="margin-top:.6rem; font-size:.9rem;"></div>
+  </div>
+
   <div class="table-container">
     <table>
       <thead>
         <tr>
-          <th style="width: 70px;">#</th>
+          <th style="width: 50px;">#</th>
           <th>R (Identificativo Monouso)</th>
           <th>C (Voto Cifrato)</th>
+          <th>h = SHA256(C) — Codice Ricevuta</th>
         </tr>
       </thead>
       <tbody>
         {% for r in bulletin.registro %}
-        <tr>
+        <tr id="row-{{ r.h }}">
           <td style="color:var(--text-muted); font-weight: 600;">{{ loop.index }}</td>
           <td><code>{{ r.R[:24] }}…</code></td>
           <td><code>{{ r.C[:32] }}…</code></td>
+          <td><code>{{ r.h[:32] }}…</code></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
+  <script>
+  function cercaRicevuta() {
+    const h = document.getElementById('cerca-h').value.trim().toLowerCase();
+    const result = document.getElementById('cerca-result');
+    document.querySelectorAll('tbody tr').forEach(r => r.style.background = '');
+    if (!h) { result.innerHTML = ''; return; }
+    const row = document.getElementById('row-' + h);
+    if (row) {
+      row.style.background = '#fffbcc';
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      result.innerHTML = '<span style="color:var(--ok);">✓ Ricevuta trovata nel registro — scheda #' + row.cells[0].textContent + '</span>';
+    } else {
+      result.innerHTML = '<span style="color:var(--fail, #c00);">✗ Ricevuta non trovata nel registro.</span>';
+    }
+  }
+  document.getElementById('cerca-h').addEventListener('keydown', e => { if (e.key === 'Enter') cercaRicevuta(); });
+  </script>
 
   <h2>Pre-immagini Raw Decifrate</h2>
   <div class="table-container">

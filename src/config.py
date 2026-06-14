@@ -25,8 +25,8 @@ DELTA_RANGE = (2, 5)
 
 # Candidati per lista (caricabili anche da file JSON in produzione)
 CANDIDATI = {
-    "Lista A": ["Rossi", "Bianchi"],
-    "Lista B": ["Verdi", "Neri"],
+    "Lista 1": ["Rossi", "Bianchi"],
+    "Lista 2": ["Verdi", "Neri"],
 }
 
 # Identificativo univoco dell'elezione (incluso in ogni voto cifrato)

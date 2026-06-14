@@ -19,7 +19,7 @@ setup e non partecipa allo spoglio):
 La chiave istituzionale sk_E sopravvive a dissolve() perché serve per
 freeze_and_sign e certify.
 
-Firma: hash-and-sign textbook §7.1 — NON PSS (fuori scope del corso).
+Firma: RSA-PSS con SHA-256 (§7.1).
 """
 
 import hashlib
@@ -136,7 +136,7 @@ class ElectoralAuthority:
             "n":           N_TRUSTEES,
         }
         params_bytes       = _params_canonical_bytes(params)
-        params["sigma_E"]  = hash_and_sign(self._sk_E, params_bytes)
+        params["sigma_E"]  = hash_and_sign(self._sk_E, params_bytes).hex()
 
         # 5 — Pubblica
         if vbr is not None:
@@ -195,18 +195,18 @@ class ElectoralAuthority:
         self._dissolved = True
         print(f"[{self.name}] Dissolto: sk_elec e share eliminati.")
 
-    def freeze_and_sign(self, rho: bytes) -> int:
+    def freeze_and_sign(self, rho: bytes) -> bytes:
         """
         Firma la radice di Merkle rho alla chiusura delle urne.
 
         Returns:
-            sigma = hash_and_sign(sk_E, rho)  (intero)
+            sigma = hash_and_sign(sk_E, rho)  (bytes, RSA-PSS)
         """
         sigma = hash_and_sign(self._sk_E, rho)
         print(f"[{self.name}] rho firmata: {rho.hex()[:24]}…")
         return sigma
 
-    def certify(self, results: dict) -> int:
+    def certify(self, results: dict) -> bytes:
         """
         Firma il verbale finale.
 
@@ -214,7 +214,7 @@ class ElectoralAuthority:
             results: dizionario {candidato: voti}.
 
         Returns:
-            sigma = hash_and_sign(sk_E, verbale_bytes)
+            sigma = hash_and_sign(sk_E, verbale_bytes)  (bytes, RSA-PSS)
         """
         verbale_bytes = str(sorted(results.items())).encode()
         sigma = hash_and_sign(self._sk_E, verbale_bytes)
@@ -225,7 +225,7 @@ class ElectoralAuthority:
     # Verifica pubblica                                                    #
     # ------------------------------------------------------------------ #
 
-    def verify_signature(self, message: bytes, sigma: int) -> bool:
+    def verify_signature(self, message: bytes, sigma: bytes) -> bool:
         """Verifica una firma emessa da questa authority con hash_and_verify."""
         return hash_and_verify(self.pk_E, message, sigma)
 

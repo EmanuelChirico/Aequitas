@@ -19,7 +19,6 @@ NOTA DI SICUREZZA (per l'esame):
 
 import threading
 from dataclasses import dataclass, field
-from typing import Optional
 
 from config import LAMBDA
 from crypto.rsa_utils import gen_rsa_keypair, hash_and_sign, hash_and_verify
@@ -54,7 +53,7 @@ class IAP:
     # §4.3 — Accreditamento                                                #
     # ------------------------------------------------------------------ #
 
-    def accredit(self, identity: str, R: bytes) -> tuple[bytes, int]:
+    def accredit(self, identity: str, R: bytes) -> tuple[bytes, bytes]:
         """
         Accredita il votante e firma il token R.
 
@@ -94,7 +93,7 @@ class IAP:
     # Verifica (usata dal VBR)                                             #
     # ------------------------------------------------------------------ #
 
-    def verify(self, R: bytes, sigma: int) -> bool:
+    def verify(self, R: bytes, sigma: bytes) -> bool:
         """Verifica la firma IAP su R (delegabile al VBR con la pk_IAP pubblica)."""
         return hash_and_verify(self.pk_IAP, R, sigma)
 
