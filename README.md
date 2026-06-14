@@ -78,7 +78,7 @@ cp .env.example .env            # poi edita con le credenziali Google OAuth
 python src/main.py
 ```
 
-### Variabili d'ambiente (`.env`)
+### Environment variables (`.env`)
 
 | Variabile | Descrizione |
 |-----------|-------------|
@@ -86,7 +86,7 @@ python src/main.py
 | `GOOGLE_CLIENT_SECRET` | Client Secret app Google OAuth |
 | `FLASK_SECRET_KEY` | Chiave per la firma dei cookie di sessione |
 
-### Esecuzione test
+### Test
 
 ```bash
 pytest tests/
