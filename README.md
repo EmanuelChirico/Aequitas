@@ -7,9 +7,21 @@
 ![Crypto](https://img.shields.io/badge/Crypto-RSA--OAEP%20%7C%20Shamir%20SSS%20%7C%20Merkle-blueviolet)
 ![Status](https://img.shields.io/badge/Status-Academic%20Prototype-orange)
 
-**Authors:** Autorino Luigi, Emanuel Chirico
+## Academic Information
+
+**Project:** Aequitas — Secure E-Voting Protocol
+
 **Course:** Algoritmi e Protocolli di Sicurezza
+
+**Degree Program:** M.Sc. in Computer Science
+
 **Institution:** Università degli Studi di Salerno
+
+**Academic Year:** 2025–2026
+
+**Authors:**
+- Autorino Luigi
+- Chirico Emanuel
 
 ---
 
@@ -44,19 +56,19 @@ The project is divided into four Work Packages:
 
 ```text
 Aequitas/
-├── .env                        # Segreti locali (Google OAuth, admin token) — non versionato
+├── .env                        # Local secrets (Google OAuth, admin token) — non versionato
 ├── requirements.txt
-├── docs/                       # Papers (tutti i WP)
+├── docs/                       # Papers (divided in WP)
 ├── tests/
-│   └── test_crypto.py          # Suite di test sui primitivi crittografici
+│   └── test_crypto.py          # Test suite on primitives 
 └── src/
-    ├── main.py                 # Entry point: init entità + avvio Flask
-    ├── config.py               # Parametri globali di protocollo
+    ├── main.py                 # Entry point
+    ├── config.py               # Global params
     ├── crypto/
-    │   ├── rsa_utils.py        # Generazione chiavi, OAEP, hash-and-sign
-    │   ├── shamir.py           # Shamir Secret Sharing in Z_Q
-    │   ├── merkle.py           # Merkle tree + prove di inclusione
-    │   └── oaep_decode.py      # Decodifica manuale padding OAEP
+    │   ├── rsa_utils.py        # Key gen, OAEP, hash-and-sign
+    │   ├── shamir.py           # Shamir Secret Sharing 
+    │   ├── merkle.py           # Merkle tree 
+    │   └── oaep_decode.py      # Decoding padding OAEP
     ├── entities/
     │   ├── electoral_auth.py   # ElectoralAuthority (E)
     │   ├── iap.py              # Identity & Authentication Provider (IAP)
@@ -66,7 +78,7 @@ Aequitas/
     │   └── voter.py            # VoterClient (lato client)
     └── web/
         ├── app.py              # Flask app factory + route handlers
-        └── templates/          # Template Jinja2 (index, vote, receipt, results, …)
+        └── templates/          # Template (HTML)
 ```
 
 ---
@@ -74,18 +86,18 @@ Aequitas/
 ## Setup & Run
 
 ```bash
-# Crea e attiva un virtualenv
+# Create and activate a virtual environment
 python -m venv .venv
 .venv\Scripts\activate          # Windows
 # source .venv/bin/activate     # Linux / macOS
 
-# Installa le dipendenze
+# Install requirements
 pip install -r requirements.txt
 
-# Configura le variabili d'ambiente
-cp .env.example .env            # poi edita con le credenziali Google OAuth
+# Configure .env
+cp .env.example .env            # Credentials Google OAuth
 
-# Avvia il server
+# Start the server
 python src/main.py
 ```
 
@@ -117,4 +129,12 @@ Voter ──► VBR (submit vote)  ──► Receipt + Merkle proof
 
 ---
 
-*Academic prototype — not intended for production use.*
+---
+
+## Disclaimer
+
+This project was developed for academic and educational purposes within the course *Algoritmi e Protocolli di Sicurezza* at the University of Salerno.
+
+The implementation serves as a proof-of-concept prototype and has not undergone the extensive security review, formal verification, or operational testing required for deployment in real-world elections.
+
+**Not intended for production use.**
