@@ -1,186 +1,271 @@
+#!/usr/bin/env python3
 """
-benchmark.py — misure di prestazione per il WP4 (§8.4).
+benchmark.py — Banco di prova prestazionale per Aequitas (WP4).
 
-Simula M votanti sintetici senza passare dal layer web e misura:
-  - Throughput di VBR.submit() (voti/secondo)
-  - Tempo totale dello spoglio (TallyMachine.tally): atteso il collo di
-    bottiglia, poiché ogni decifratura richiede un'esponenziazione modulare
-    RSA-2048 → costo O(M · k^3) dove k è la dimensione del blocco.
-  - Tempo della verifica universale (MerkleTree rebuild + controlli)
+Scenario simulato: elezione con N_VOTERS = 1000 elettori.
 
-Utilizzo:
-    python benchmark.py [100 | 1000 | 10000]
-    python benchmark.py all     ← esegue tutte e tre le dimensioni
-    python benchmark.py         ← default: 100
+Sezioni:
+  1. Costo computazionale delle primitive crittografiche
+  2. Dimensione dei messaggi scambiati
+  3. Latenza scomposta delle operazioni di verifica
+  4. Scalabilita': freeze + tally al variare di N
 
-Output: tabella su stdout + CSV in benchmark_results.csv
+Uso (dalla root del repo):
+    python benchmark/benchmark.py
+    python benchmark/benchmark.py --reps 100
+    python benchmark/benchmark.py --latex
 """
 
-import csv
+import argparse
+import hashlib
+import json
 import os
 import secrets
+import statistics
 import sys
 import time
 
-# Aggiunge src/ al path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from config import N_TRUSTEES
-from crypto.rsa_utils import gen_rsa_keypair, oaep_encrypt, hash_and_sign
-from entities.electoral_auth import ElectoralAuthority
-from entities.iap import IAP
-from entities.tally_machine import TallyMachine
-from entities.trustee import Trustee
-from entities.vbr import VBR
+from config import N_TRUSTEES, T, SHARE_BYTES   # noqa: E402
+from crypto.rsa_utils import (                   # noqa: E402
+    gen_rsa_keypair, oaep_encrypt, oaep_decrypt,
+    hash_and_sign, hash_and_verify,
+)
+from crypto import shamir                        # noqa: E402
+from crypto.merkle import MerkleTree             # noqa: E402
+from crypto.oaep_decode import decode_oaep, InvalidOAEP  # noqa: E402
+
+N_VOTERS = 1000
 
 
-def _setup_entities(M: int):
-    """Prepara le entità del protocollo e genera M coppie (R, C) sintetiche."""
-
-    # Istanzia le entità
-    e  = ElectoralAuthority(name="BenchmarkAuthority")
-    iap = IAP(liste_elettorali={f"voter{i}@bench.test" for i in range(M)})
-    vbr = VBR(pk_IAP=iap.pk_IAP)
-    tm  = TallyMachine()
-    trustees = [Trustee(trustee_id=i + 1, name=f"T{i+1}") for i in range(N_TRUSTEES)]
-
-    params = e.setup(pk_iap=iap.pk_IAP, vbr=vbr)
-    e.distribute_shares(trustees)
-    e.dissolve()
-
-    pk_elec = None   # pk_elec è ora accessibile via params
-    from crypto.rsa_utils import gen_rsa_keypair
-    # Ricrea pk_elec dai parametri pubblicati (come farebbe un osservatore esterno)
-    from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
-    pub_nums = params["pk_elec"]
-    pk_elec_raw = RSAPublicNumbers(
-        e=pub_nums["e"], n=pub_nums["n"]
-    ).public_key()
-
-    # Genera M voti sintetici
-    votes = []
-    candidati_flat = ["Lista A - Rossi", "Lista A - Bianchi",
-                      "Lista B - Verdi", "Lista B - Neri"]
-    for i in range(M):
-        identity = f"voter{i}@bench.test"
-        R = secrets.token_bytes(32)
-        _, sigma = iap.accredit(identity, R)
-        v = candidati_flat[i % len(candidati_flat)]
-        # Payload a lunghezza fissa (64 B)
-        import json
-        payload = json.dumps({"election_id": "bench", "vote": v})
-        padded  = payload.encode().ljust(64, b"\x00")
-        C = oaep_encrypt(pk_elec_raw, padded)
-        votes.append((R, sigma, C))
-
-    return e, vbr, tm, trustees, pk_elec_raw, votes
-
-
-def run_benchmark(M: int) -> dict:
-    print(f"\n{'='*55}")
-    print(f"  Benchmark M = {M} votanti")
-    print(f"{'='*55}")
-
-    print(f"  [1/4] Setup + generazione {M} voti sintetici…")
-    t0 = time.perf_counter()
-    e, vbr, tm, trustees, pk_elec, votes = _setup_entities(M)
-    t_setup = time.perf_counter() - t0
-    print(f"        Setup completato in {t_setup:.2f} s")
-
-    # ---- VBR.submit throughput ----
-    print(f"  [2/4] Invio {M} voti al VBR…")
-    t0 = time.perf_counter()
-    for R, sigma, C in votes:
-        vbr.submit(R, sigma, C)
-    t_submit = time.perf_counter() - t0
-    throughput = M / t_submit if t_submit > 0 else float("inf")
-    print(f"        submit: {t_submit:.3f} s  ({throughput:.0f} voti/s)")
-
-    # ---- Freeze + spoglio ----
-    print("  [3/4] Freeze + spoglio (collo di bottiglia atteso)…")
-    t0 = time.perf_counter()
-    rho       = vbr.freeze()
-    rho_sigma = e.freeze_and_sign(rho)
-    tm.load_uvc(vbr, e.pk_E)
-    tm.set_rho_signature(rho_sigma, e.pk_E)
-    commitments = e.commitments
-    tm.collect_shares(trustees, commitments)
-    tm.reconstruct_key(pk_elec)
-    results, _ = tm.tally(pk_elec)
-    tm.destroy_key()
-    t_tally = time.perf_counter() - t0
-    print(f"        Spoglio: {t_tally:.3f} s  ({M/t_tally:.0f} voti/s)")
-    print(f"        Risultati: {results}")
-
-    # ---- Verifica universale ----
-    print("  [4/4] Verifica universale…")
-    from web.app import _verifica_universale
-    import json
-    e.certify(results)
-    results_sigma = e.certify(results)
-    vbr.publish(
-        rho_sigma=rho_sigma,
-        pre_images=tm.pre_images,
-        results=results,
-        results_sigma=results_sigma,
-        path=f"benchmark_bulletin_{M}.json",
-    )
-    t0 = time.perf_counter()
-    with open(f"benchmark_bulletin_{M}.json") as f:
-        bull = json.load(f)
-    verifica = _verifica_universale(bull)
-    t_verifica = time.perf_counter() - t0
-    ok = all(verifica.values())
-    print(f"        Verifica: {t_verifica:.3f} s  — {'OK ✓' if ok else 'FALLITA ✗'}")
-
+# ---------------------------------------------------------------------------
+# Cronometro
+# ---------------------------------------------------------------------------
+def bench(label, op, reps, warmup=3):
+    """Esegue op() reps volte, scartando warmup run iniziali."""
+    for _ in range(warmup):
+        op()
+    samples = []
+    for _ in range(reps):
+        t0 = time.perf_counter()
+        op()
+        samples.append((time.perf_counter() - t0) * 1000.0)
     return {
-        "M":              M,
-        "t_setup_s":      round(t_setup, 3),
-        "t_submit_s":     round(t_submit, 3),
-        "throughput_vps": round(throughput, 1),
-        "t_tally_s":      round(t_tally, 3),
-        "t_verifica_s":   round(t_verifica, 3),
-        "verifica_ok":    ok,
+        "label": label,
+        "mean":  statistics.mean(samples),
+        "stdev": statistics.stdev(samples) if len(samples) > 1 else 0.0,
     }
 
 
-def print_table(rows: list[dict]) -> None:
-    cols = ["M", "t_setup_s", "t_submit_s", "throughput_vps",
-            "t_tally_s", "t_verifica_s", "verifica_ok"]
-    widths = [max(len(c), max(len(str(r[c])) for r in rows)) for c in cols]
-    sep = "  ".join("-" * w for w in widths)
-    hdr = "  ".join(c.ljust(w) for c, w in zip(cols, widths))
-    print(f"\n{'='*len(sep)}")
-    print("RIEPILOGO BENCHMARK")
-    print(sep)
-    print(hdr)
-    print(sep)
-    for r in rows:
-        print("  ".join(str(r[c]).ljust(w) for c, w in zip(cols, widths)))
-    print(sep)
+# ---------------------------------------------------------------------------
+# 1. Costo primitive crittografiche
+# ---------------------------------------------------------------------------
+def bench_primitives(reps):
+    sk = gen_rsa_keypair()
+    pk = sk.public_key()
+    pub = pk.public_numbers()
+
+    m = b"Lista A - Mario Rossi\x00" * 2
+    C = oaep_encrypt(pk, m)
+    token_R = secrets.token_bytes(32)
+    sig = hash_and_sign(sk, token_R)
+
+    d = sk.private_numbers().d
+    shares = shamir.split(d, N_TRUSTEES, T)
+    sub_shares = [(i + 1, shares[i]) for i in range(T)]
+
+    leaves = [secrets.token_bytes(32) for _ in range(N_VOTERS)]
+    tree = MerkleTree(leaves)
+    root = tree.root()
+    prf = tree.proof(0)
+
+    C_int = int.from_bytes(C, "big")
+    m_prime = pow(C_int, d, pub.n)
+
+    S_i = shares[0].to_bytes(SHARE_BYTES, "big")
+    r_i = secrets.token_bytes(32)
+    c_i = hashlib.sha256(S_i + r_i).digest()
+
+    return [
+        bench("RSA-2048 keygen",
+              lambda: gen_rsa_keypair(),                            max(5, reps // 5)),
+        bench("OAEP encrypt (voto)",
+              lambda: oaep_encrypt(pk, m),                         reps),
+        bench("OAEP decrypt",
+              lambda: oaep_decrypt(sk, C),                         reps),
+        bench("RSA-PSS sign (accredit IAP)",
+              lambda: hash_and_sign(sk, token_R),                  reps),
+        bench("RSA-PSS verify (VBR)",
+              lambda: hash_and_verify(pk, token_R, sig),           reps),
+        bench(f"Shamir split (t={T}, n={N_TRUSTEES})",
+              lambda: shamir.split(d, N_TRUSTEES, T),              reps),
+        bench("Shamir reconstruct (Lagrange)",
+              lambda: shamir.reconstruct(sub_shares),              reps),
+        bench(f"Merkle build ({N_VOTERS} foglie)",
+              lambda: MerkleTree(leaves),                          max(5, reps // 5)),
+        bench("Merkle proof gen",
+              lambda: tree.proof(0),                               reps),
+        bench("Merkle proof verify",
+              lambda: MerkleTree.verify(leaves[0], prf, root),    reps),
+        bench("Verifica pubblica dec. (m'^e=C)",
+              lambda: pow(m_prime, pub.e, pub.n) == C_int,         reps),
+        bench("Verifica impegno trustee (SHA-256)",
+              lambda: hashlib.sha256(S_i + r_i).digest() == c_i,  reps),
+    ]
 
 
-def save_csv(rows: list[dict], path: str = "benchmark_results.csv") -> None:
-    if not rows:
-        return
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
-        writer.writeheader()
-        writer.writerows(rows)
-    print(f"\nRisultati CSV salvati in {path}")
+# ---------------------------------------------------------------------------
+# 2. Dimensione dei messaggi
+# ---------------------------------------------------------------------------
+def bench_message_sizes():
+    sk = gen_rsa_keypair()
+    pk = sk.public_key()
+
+    R = secrets.token_bytes(32)
+    sigma = hash_and_sign(sk, R)
+    m = b"Lista A - Mario Rossi\x00" * 2
+    C = oaep_encrypt(pk, m)
+
+    leaves = [secrets.token_bytes(32) for _ in range(N_VOTERS)]
+    tree = MerkleTree(leaves)
+    prf = tree.proof(0)
+    prf_json = json.dumps([(s.hex(), side) for s, side in prf]).encode()
+
+    submit_json = json.dumps({
+        "R": R.hex(), "sigma": sigma.hex(), "C": C.hex(),
+    }).encode()
+
+    return {
+        "R (token accredito)":                    len(R),
+        "sigma (firma RSA-PSS)":                  len(sigma),
+        "C (voto cifrato OAEP)":                  len(C),
+        "submit raw (R + sigma + C)":             len(R) + len(sigma) + len(C),
+        "submit JSON (hex)":                      len(submit_json),
+        f"prova Merkle ({N_VOTERS} foglie, JSON)": len(prf_json),
+    }
+
+
+# ---------------------------------------------------------------------------
+# 3. Latenza verifiche
+# ---------------------------------------------------------------------------
+def bench_verifications(reps):
+    sk = gen_rsa_keypair()
+    pk = sk.public_key()
+    pub = pk.public_numbers()
+
+    R = secrets.token_bytes(32)
+    sig = hash_and_sign(sk, R)
+
+    m = b"Lista A - Mario Rossi\x00" * 2
+    C = oaep_encrypt(pk, m)
+    C_int = int.from_bytes(C, "big")
+    m_prime = pow(C_int, sk.private_numbers().d, pub.n)
+
+    leaves = [secrets.token_bytes(32) for _ in range(N_VOTERS)]
+    tree = MerkleTree(leaves)
+    root = tree.root()
+    prf = tree.proof(0)
+
+    S_i = secrets.token_bytes(SHARE_BYTES)
+    r_i = secrets.token_bytes(32)
+    c_i = hashlib.sha256(S_i + r_i).digest()
+
+    return [
+        bench("Firma IAP su R (VBR)",
+              lambda: hash_and_verify(pk, R, sig),                  reps),
+        bench(f"Inclusione Merkle ({N_VOTERS} foglie)",
+              lambda: MerkleTree.verify(leaves[0], prf, root),      reps),
+        bench("Verifica pubblica dec. (m'^e=C)",
+              lambda: pow(m_prime, pub.e, pub.n) == C_int,          reps),
+        bench("Impegno share trustee (SHA-256)",
+              lambda: hashlib.sha256(S_i + r_i).digest() == c_i,   reps),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# 4. Scalabilita' freeze + tally
+# ---------------------------------------------------------------------------
+def bench_scalability(sizes=(10, 50, 100, 500, 1000)):
+    sk = gen_rsa_keypair()
+    pk = sk.public_key()
+    pub = pk.public_numbers()
+    d = sk.private_numbers().d
+    k = pub.n.bit_length() // 8
+
+    results = []
+    for N in sizes:
+        # Prepara N triple (R, sigma, C) fuori dal timer
+        triples = [
+            (secrets.token_bytes(32),
+             hash_and_sign(sk, secrets.token_bytes(32)),
+             oaep_encrypt(pk, f"Cand{i % 5}".encode()))
+            for i in range(N)
+        ]
+
+        # Freeze reale: sort per R + SHA256(R||sigma||C) per ogni tripla + build tree
+        t0 = time.perf_counter()
+        triples.sort(key=lambda t: t[0])
+        leaves = [hashlib.sha256(r + s + c).digest() for r, s, c in triples]
+        tree = MerkleTree(leaves)
+        _ = tree.root()
+        freeze_ms = (time.perf_counter() - t0) * 1000.0
+
+        # Tally reale: pow(C,d,N) + verifica pubblica pow(m',e,N)==C + decode_oaep
+        t0 = time.perf_counter()
+        for _, _, c in triples:
+            C_int = int.from_bytes(c, "big")
+            m_prime = pow(C_int, d, pub.n)
+            assert pow(m_prime, pub.e, pub.n) == C_int
+            try:
+                decode_oaep(m_prime, k)
+            except InvalidOAEP:
+                pass  # scheda nulla
+        tally_ms = (time.perf_counter() - t0) * 1000.0
+
+        results.append((N, freeze_ms, tally_ms))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+def print_timing(title, rows, latex):
+    print(f"\n== {title} ==")
+    if latex:
+        for r in rows:
+            print(f"{r['label']} & {r['mean']:.3f} & {r['stdev']:.3f} \\\\")
+    else:
+        print(f"{'Operazione':<48} {'media':>9} {'stdev':>8}  (ms)")
+        for r in rows:
+            print(f"{r['label']:<48} {r['mean']:>9.3f} {r['stdev']:>8.3f}")
+
+
+def print_sizes(data, latex):
+    print("\n== Dimensione messaggi (byte) ==")
+    for name, b in data.items():
+        print(f"{name} & {b} \\\\" if latex else f"{name:<50} {b:>7} B")
+
+
+def print_scalability(results, latex):
+    print("\n== Scalabilita': freeze + tally ==")
+    if latex:
+        for N, fr, ta in results:
+            print(f"{N} & {fr:.2f} & {ta:.2f} & {ta/N:.3f} \\\\")
+    else:
+        print(f"{'N':<7} {'freeze':>10} {'tally':>10} {'tally/voto':>12}  (ms)")
+        for N, fr, ta in results:
+            print(f"{N:<7} {fr:>10.2f} {ta:>10.2f} {ta/N:>12.3f}")
 
 
 if __name__ == "__main__":
-    arg = sys.argv[1] if len(sys.argv) > 1 else "100"
-    if arg == "all":
-        sizes = [100, 1000, 10000]
-    else:
-        try:
-            sizes = [int(arg)]
-        except ValueError:
-            print(f"Argomento non valido: {arg}. Uso: python benchmark.py [100|1000|10000|all]")
-            sys.exit(1)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--reps", type=int, default=50)
+    ap.add_argument("--latex", action="store_true")
+    args = ap.parse_args()
 
-    rows = [run_benchmark(M) for M in sizes]
-    print_table(rows)
-    save_csv(rows)
+    print(f"# Aequitas WP4 benchmark — {args.reps} reps, {N_VOTERS} elettori simulati\n")
+    print_timing("1. Costo primitive crittografiche", bench_primitives(args.reps), args.latex)
+    print_sizes(bench_message_sizes(), args.latex)
+    print_timing("3. Latenza verifiche", bench_verifications(args.reps), args.latex)
+    print_scalability(bench_scalability(), args.latex)
