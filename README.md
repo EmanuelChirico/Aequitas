@@ -7,109 +7,43 @@
 ![Crypto](https://img.shields.io/badge/Crypto-RSA--OAEP%20%7C%20Shamir%20SSS%20%7C%20Merkle-blueviolet)
 ![Status](https://img.shields.io/badge/Status-Academic%20Prototype-orange)
 
-## Academic Information
-
-**Project:** Aequitas — Secure E-Voting Protocol
-
-**Course:** Algoritmi e Protocolli di Sicurezza
-
-**Degree Program:** M.Sc. in Computer Science
-
-**Institution:** Università degli Studi di Salerno
-
-**Academic Year:** 2025–2026
-
-**Authors:**
-- Autorino Luigi
-- Chirico Emanuel
+> M.Sc. Computer Science — Università degli Studi di Salerno, 2025–2026
+> Autorino Luigi · Chirico Emanuel
 
 ---
 
-## Overview
+Aequitas is a cryptographic protocol for secure digital elections with nominal preference voting. It implements end-to-end verifiable voting with minimal trust assumptions: the election key is never held in full by any single party, voters receive individual inclusion proofs, and the full tally is publicly verifiable by anyone.
 
-Aequitas is a cryptographic protocol for secure digital elections with nominal preference voting. The system implements end-to-end verifiable voting with minimal trust assumptions, enabling municipal-scale elections while preserving voter privacy, ensuring ballot integrity, and providing public verifiability of results.
+## Core properties
 
-The project is divided into four Work Packages:
+- **Minimal trust** — election key split via Shamir threshold secret sharing across independent trustees
+- **End-to-end verifiability** — each voter gets a Merkle inclusion receipt; the tally is open to external audit
+- **Voter privacy** — authorization token decoupled from the encrypted preference
+- **Double-vote prevention** — atomic ballot acceptance enforced at the register level
 
-| WP | Title | Content |
-| --- | --- | --- |
-| **WP1** | Threat Modeling & Architecture | Security properties, adversarial models, system actors |
-| **WP2** | Protocol Specification | Setup, voting, tallying phases; RSA-OAEP, Shamir SSS, Merkle trees |
-| **WP3** | Security Analysis | Threat resilience, parameter selection, residual risks |
-| **WP4** | Implementation & Performance | Flask prototype, benchmarks, test suite |
+**Stack** — Python 3.10+, Flask, RSA-OAEP, Shamir SSS, Merkle trees, OpenID Connect (Google, as SPID stand-in)
 
 ---
 
-## Key Properties
-
-| Property | Description |
-| --- | --- |
-| **Minimal Trust** | Private election key never exists in one place: split via Shamir threshold secret sharing across N trustees |
-| **End-to-End Verifiability** | Voters verify ballot inclusion via personal receipt; external observers validate the full tally cryptographically |
-| **Voter Privacy** | Token-based authorization decoupled from preference encryption; temporal decorrelation via random delays |
-| **Integrity** | Atomic ballot acceptance prevents double voting; publicly verifiable decryption prevents result manipulation |
-| **Scalability** | Lightweight per-ballot validation at submission; heavy computation deferred to post-election tallying |
-
----
-
-## Repository Structure
-
-```text
-Aequitas/
-├── .env                        # Local secrets (Google OAuth, admin token) — non versionato
-├── requirements.txt
-├── docs/                       # Papers (divided in WP)
-├── tests/
-│   └── test_crypto.py          # Test suite on primitives 
-└── src/
-    ├── main.py                 # Entry point
-    ├── config.py               # Global params
-    ├── crypto/
-    │   ├── rsa_utils.py        # Key gen, OAEP, hash-and-sign
-    │   ├── shamir.py           # Shamir Secret Sharing 
-    │   ├── merkle.py           # Merkle tree 
-    │   └── oaep_decode.py      # Decoding padding OAEP
-    ├── entities/
-    │   ├── electoral_auth.py   # ElectoralAuthority (E)
-    │   ├── iap.py              # Identity & Authentication Provider (IAP)
-    │   ├── vbr.py              # Verified Ballot Register (VBR)
-    │   ├── trustee.py          # Trustee (T_i)
-    │   ├── tally_machine.py    # TallyMachine (TM)
-    │   └── voter.py            # VoterClient (lato client)
-    └── web/
-        ├── app.py              # Flask app factory + route handlers
-        └── templates/          # Template (HTML)
-```
-
----
-
-## Setup & Run
+## Setup
 
 ```bash
-# Create and activate a virtual environment
 python -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # Linux / macOS
-
-# Install requirements
+.venv\Scripts\activate        # Windows — or: source .venv/bin/activate
 pip install -r requirements.txt
-
-# Configure .env
-cp .env.example .env            # Credentials Google OAuth
-
-# Start the server
+cp .env.example .env          # fill in Google OAuth credentials
 python src/main.py
 ```
 
-### Environment Variables (`.env`)
+`.env` variables:
 
 | Variable | Description |
 | --- | --- |
-| `GOOGLE_CLIENT_ID` | Client ID app Google OAuth |
-| `GOOGLE_CLIENT_SECRET` | Client Secret app Google OAuth |
-| `FLASK_SECRET_KEY` | Chiave per la firma dei cookie di sessione |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `FLASK_SECRET_KEY` | Flask session signing key |
 
-### Testing
+> Authentication uses Google OpenID Connect as a stand-in for SPID (Sistema Pubblico di Identità Digitale). The flow is structurally equivalent — redirect → token → identity verification — with Google acting as the identity provider in place of a certified SPID IdP.
 
 ```bash
 pytest tests/
@@ -117,24 +51,16 @@ pytest tests/
 
 ---
 
-## Protocol Architecture
+## Architecture
 
 ```text
 Voter ──► IAP (authenticate) ──► Token
-Voter ──► E   (get ballot)   ──► Encrypted ballot form
-Voter ──► VBR (submit vote)  ──► Receipt + Merkle proof
+Voter ──► E   (get ballot)   ──► Encrypted ballot
+Voter ──► VBR (submit)       ──► Receipt + Merkle proof
               │
               └──► TallyMachine ──► Trustees (threshold decrypt) ──► Results
 ```
 
 ---
 
----
-
-## Disclaimer
-
-This project was developed for academic and educational purposes within the course *Algoritmi e Protocolli di Sicurezza* at the University of Salerno.
-
-The implementation serves as a proof-of-concept prototype and has not undergone the extensive security review, formal verification, or operational testing required for deployment in real-world elections.
-
-**Not intended for production use.**
+> **Disclaimer** — Proof-of-concept prototype. Not intended for production use.
