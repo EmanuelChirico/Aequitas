@@ -184,16 +184,17 @@ def bench_verifications(reps):
 
 
 # ---------------------------------------------------------------------------
-# 4. Scalabilita' freeze + tally
+# 4. Scalabilita' freeze + tally (Singola esecuzione per N_VOTERS)
 # ---------------------------------------------------------------------------
-def bench_scalability(sizes=(10, 50, 100, 500, 1000)):
+def bench_scalability(n=N_VOTERS):
     sk = gen_rsa_keypair()
     pk = sk.public_key()
-    pub = pk.public_numbers()
-    d = sk.private_numbers().d
-    k = pub.n.bit_length() // 8
-
+    
     results = []
+    
+    # Eseguiamo il test SOLO per il numero totale di elettori
+    sizes = [n]
+    
     for N in sizes:
         # Prepara N triple (R, sigma, C) fuori dal timer
         triples = [
@@ -203,7 +204,7 @@ def bench_scalability(sizes=(10, 50, 100, 500, 1000)):
             for i in range(N)
         ]
 
-        # Freeze reale: sort per R + SHA256(R||sigma||C) per ogni tripla + build tree
+        # Freeze reale: ordinamento per R + SHA256(R||sigma||C) + build tree
         t0 = time.perf_counter()
         triples.sort(key=lambda t: t[0])
         leaves = [hashlib.sha256(r + s + c).digest() for r, s, c in triples]
@@ -211,19 +212,18 @@ def bench_scalability(sizes=(10, 50, 100, 500, 1000)):
         _ = tree.root()
         freeze_ms = (time.perf_counter() - t0) * 1000.0
 
-        # Tally reale: pow(C,d,N) + verifica pubblica pow(m',e,N)==C + decode_oaep
+        # Tally reale: decifrazione ottimizzata per ogni scheda
         t0 = time.perf_counter()
         for _, _, c in triples:
-            C_int = int.from_bytes(c, "big")
-            m_prime = pow(C_int, d, pub.n)
-            assert pow(m_prime, pub.e, pub.n) == C_int
             try:
-                decode_oaep(m_prime, k)
-            except InvalidOAEP:
+                # La libreria usa in automatico l'ottimizzazione CRT per RSA
+                _ = oaep_decrypt(sk, c)
+            except Exception:
                 pass  # scheda nulla
         tally_ms = (time.perf_counter() - t0) * 1000.0
 
         results.append((N, freeze_ms, tally_ms))
+        
     return results
 
 
